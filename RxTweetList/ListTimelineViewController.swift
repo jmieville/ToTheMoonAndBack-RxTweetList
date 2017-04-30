@@ -9,6 +9,7 @@
 import UIKit
 import RxSwift
 import Then
+import RxRealmDataSources
 
 class ListTimelineViewController: UIViewController {
     
@@ -30,7 +31,29 @@ class ListTimelineViewController: UIViewController {
         super.viewDidLoad()
         tableView.estimatedRowHeight = 90
         tableView.rowHeight = UITableViewAutomaticDimension
+        title = "@\(viewModel.list.username)/\(viewModel.list.slug)"
+        navigationItem.rightBarButtonItem =
+            UIBarButtonItem(barButtonSystemItem: .bookmarks, target: nil, action:
+                nil)
         bindUI()
+        navigationItem.rightBarButtonItem!.rx.tap
+            .throttle(0.5, scheduler: MainScheduler.instance)
+            .subscribe(onNext: { [weak self] _ in
+                guard let this = self else { return }
+                this.navigator.show(segue: .listPeople(this.viewModel.account,
+                                                       this.viewModel.list), sender: this)
+            })
+            .addDisposableTo(bag)
+        let dataSource = RxTableViewRealmDataSource<Tweet>(cellIdentifier:
+        "TweetCellView", cellType: TweetCellView.self) { cell, _, tweet in
+            cell.update(with: tweet)
+        }
+        viewModel.tweets
+            .bindTo(tableView.rx.realmChanges(dataSource))
+            .addDisposableTo(bag)
+        viewModel.loggedIn
+            .drive(messageView.rx.isHidden)
+            .addDisposableTo(bag)
     }
     
     func bindUI() {
